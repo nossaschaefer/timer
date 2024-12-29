@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness Timer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        #countdown,
+        #unit-counter,
+        #total-duration,
+        #total-time {
+            font-size: 1.5rem;
+            margin: 10px 0;
+        }
+
+        #progress-bar {
+            width: 300px;
+            height: 20px;
+            background: #ddd;
+            margin: 20px auto;
+            position: relative;
+            border-radius: 10px;
+        }
+
+        #progress {
+            width: 0%;
+            height: 100%;
+            background: #4caf50;
+            border-radius: 10px;
+        }
+
+        #history {
+            margin-top: 30px;
+            text-align: left;
+            font-size: 1rem;
+        }
+
+        #history li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 text-center py-10">
+    <h1 class="flex justify-center text-8xl font-bold tracking-wide md:tracking-wider lg:pt-12">Fitness Timer</h1>
+    <div class="flex flex-col items-center justify-center divide-y divide-slate-400">
+
+        <!-- Main Content -->
+        <section class="mb-12">
+
+            <section class="flex gap-2 pt-12">
+
+                <button class="bg-green-500 text-white py-2 px-4 rounded-3xl shadow-md hover:bg-green-600"
+                    id="start">Start
+                    Timer</button>
+                <button class="bg-blue-500 text-white py-2 px-4 rounded-3xl shadow-md hover:bg-blue-600 min-w-[100px]"
+                    id="pause">Pause</button>
+                <button class="bg-pink-500 text-white py-2 px-4 rounded-3xl shadow-md hover:bg-pink-600" id="stop">Stop
+                    Timer</button>
+            </section>
+            <br><br>
+            <section>
+
+                <label class="mr-2" for="interval">Interval Duration (seconds): </label>
+                <select class="p-2 border rounded-md" id="interval">
+                    <option value="20">20</option>
+                    <option value="25">25</option>
+                    <option value="30">30</option>
+                    <option value="35">35</option>
+                    <option value="40">40</option>
+                    <option value="45">45</option>
+                    <option value="50">50</option>
+                    <option value="55">55</option>
+                    <option value="60">60</option>
+                    <option value="65">65</option>
+                    <option value="70">70</option>
+                    <option value="75">75</option>
+                    <option value="80">80</option>
+                    <option value="85">85</option>
+                    <option value="90">90</option>
+                    <option value="95">95</option>
+                    <option value="100">100</option>
+                    <option value="105">105</option>
+                    <option value="110">110</option>
+                    <option value="115">115</option>
+                    <option value="120">120</option>
+                </select>
+            </section>
+
+            <div id="unit-counter">Unit: 0 / 20</div>
+            <div id="countdown">Ready...</div>
+            <div id="total-duration">Total Duration: 0 minutes</div>
+            <div class="" id="progress-bar">
+                <div id="progress"></div>
+            </div>
+
+            <audio id="beep" src="beep.mp3" preload="auto"></audio>
+            <audio id="celebration" src="celebration.mp3" preload="auto"></audio>
+        </section>
+
+        <!-- History and total workout time -->
+        <section>
+
+            <div class="pt-12" id="history">
+                <h2 class="text-4xl font-bold">Workout History</h2>
+                <ul id="history-list"></ul>
+            </div>
+
+            <div id="total-time">
+                <h2>Total Workout Time:</h2>
+                <p id="total-workout-time">0 minutes</p>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        let timer;
+        let countdownInterval;
+        let paused = false;
+        let remainingTime;
+        let count = 0;
+
+        const unitCounter = document.getElementById("unit-counter");
+        const countdownDisplay = document.getElementById("countdown");
+        const totalDurationDisplay = document.getElementById("total-duration");
+        const progress = document.getElementById("progress");
+        const beep = document.getElementById("beep");
+        const celebration = document.getElementById("celebration");
+        const intervalInput = document.getElementById("interval");
+        const historyList = document.getElementById("history-list");
+        const totalWorkoutTimeDisplay = document.getElementById("total-workout-time");
+
+        const updateTotalDuration = () => {
+            const intervalDuration = parseInt(intervalInput.value, 10);
+            if (!isNaN(intervalDuration) && intervalDuration > 0) {
+                const totalMinutes = (intervalDuration * 20) / 60;
+                totalDurationDisplay.textContent = `Total Duration: ${totalMinutes.toFixed(1)} minutes`;
+            } else {
+                totalDurationDisplay.textContent = "Total Duration: 0 minutes";
+            }
+        };
+
+        intervalInput.addEventListener("input", updateTotalDuration);
+        updateTotalDuration();
+
+        // Load the last saved interval value from localStorage
+        if (localStorage.getItem('lastInterval')) {
+            intervalInput.value = localStorage.getItem('lastInterval');
+            updateTotalDuration();
+        }
+
+        // Save the current interval value to localStorage on change
+        intervalInput.addEventListener("change", () => {
+            localStorage.setItem('lastInterval', intervalInput.value);
+        });
+
+        // Load workout history from localStorage
+        const loadHistory = () => {
+            const history = JSON.parse(localStorage.getItem('workoutHistory')) || [];
+            historyList.innerHTML = history.map((session, index) => {
+                return `<li>Session ${index + 1} on ${session.date}: ${session.units} units, Duration: ${session.totalDuration} minutes</li>`;
+            }).join('');
+            const totalWorkoutTime = history.reduce((total, session) => total + parseFloat(session.totalDuration), 0);
+            totalWorkoutTimeDisplay.textContent = `${totalWorkoutTime.toFixed(1)} minutes`;
+        };
+
+        loadHistory();
+
+        const startCountdown = (timeLeft) => {
+            progress.style.width = "0%";
+            remainingTime = timeLeft;
+            clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(() => {
+                if (remainingTime > 0) {
+                    remainingTime--;
+                    countdownDisplay.textContent = `${remainingTime} seconds remaining`;
+                    progress.style.width = `${(intervalInput.value - remainingTime) / intervalInput.value * 100}%`;
+                } else {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+        };
+
+        const saveWorkoutSession = () => {
+            const intervalDuration = parseInt(intervalInput.value, 10);
+            const totalDuration = (intervalDuration * 20) / 60;
+            const date = new Date().toLocaleString(); // Date and time of the workout session
+            const history = JSON.parse(localStorage.getItem('workoutHistory')) || [];
+            history.push({
+                units: 20,
+                totalDuration: totalDuration.toFixed(1),
+                date: date
+            });
+            localStorage.setItem('workoutHistory', JSON.stringify(history));
+            loadHistory();
+        };
+
+        document.getElementById("start").addEventListener("click", () => {
+            if (paused) {
+                paused = false;
+                document.getElementById("pause").textContent = "Pause"; // Change the button text back to "Pause"
+                startCountdown(remainingTime);
+                return;
+            }
+
+            const intervalDuration = parseInt(intervalInput.value, 10) * 1000;
+
+            if (isNaN(intervalDuration) || intervalDuration <= 0) {
+                alert("Please enter a valid number for interval duration.");
+                return;
+            }
+
+            count = 0;
+            unitCounter.textContent = "Unit: 0 / 20";
+            countdownDisplay.textContent = `${intervalInput.value} seconds remaining`;
+            progress.style.width = "0%";
+            clearInterval(timer);
+            clearInterval(countdownInterval);
+
+            timer = setInterval(() => {
+                if (count < 20) {
+                    count++;
+                    unitCounter.textContent = `Unit: ${count} / 20`;
+                    beep.play();
+                    startCountdown(parseInt(intervalInput.value, 10));
+                } else {
+                    clearInterval(timer);
+                    clearInterval(countdownInterval);
+                    countdownDisplay.textContent = "Done!";
+                    unitCounter.textContent = "All 20 units completed!";
+                    progress.style.width = "100%";
+                    celebration.play();
+                    saveWorkoutSession();  // Save the completed session to localStorage
+                }
+            }, intervalDuration);
+
+            startCountdown(parseInt(intervalInput.value, 10));
+        });
+
+        document.getElementById("pause").addEventListener("click", () => {
+            if (!paused) {
+                paused = true;
+                document.getElementById("pause").textContent = "Resume"; // Change the button text to "Resume"
+                clearInterval(timer);
+                clearInterval(countdownInterval);
+                countdownDisplay.textContent = "Paused.";
+            } else {
+                paused = false;
+                document.getElementById("pause").textContent = "Pause"; // Change back to "Pause"
+                startCountdown(remainingTime);
+            }
+        });
+
+        document.getElementById("stop").addEventListener("click", () => {
+            clearInterval(timer);
+            clearInterval(countdownInterval);
+            paused = false;
+            countdownDisplay.textContent = "Stopped.";
+            unitCounter.textContent = `Unit: ${count} / 20`;
+            progress.style.width = "0%";
+        });
+    </script>
+</body>
+
+</html>
