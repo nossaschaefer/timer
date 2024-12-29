@@ -37,11 +37,7 @@
             border-radius: 10px;
         }
 
-        #history {
-            margin-top: 30px;
-            text-align: left;
-            font-size: 1rem;
-        }
+
 
         #history li {
             margin: 5px 0;
@@ -67,47 +63,63 @@
                     Timer</button>
             </section>
             <br><br>
-            <section>
 
-                <label class="mr-2" for="interval">Interval Duration (seconds): </label>
-                <select class="p-2 border rounded-md" id="interval">
-                    <option value="20">20</option>
-                    <option value="25">25</option>
-                    <option value="30">30</option>
-                    <option value="35">35</option>
-                    <option value="40">40</option>
-                    <option value="45">45</option>
-                    <option value="50">50</option>
-                    <option value="55">55</option>
-                    <option value="60">60</option>
-                    <option value="65">65</option>
-                    <option value="70">70</option>
-                    <option value="75">75</option>
-                    <option value="80">80</option>
-                    <option value="85">85</option>
-                    <option value="90">90</option>
-                    <option value="95">95</option>
-                    <option value="100">100</option>
-                    <option value="105">105</option>
-                    <option value="110">110</option>
-                    <option value="115">115</option>
-                    <option value="120">120</option>
-                </select>
+            <section class="flex flex-col gap-2 justify-end">
+                <!-- Interval Duration -->
+                <section>
+                    <label class="mr-2" for="interval">Interval Duration (seconds): </label>
+                    <select class="p-2 border rounded-md" id="interval">
+                        <option value="20">20</option>
+                        <option value="25">25</option>
+                        <option value="30">30</option>
+                        <option value="35">35</option>
+                        <option value="40">40</option>
+                        <option value="45">45</option>
+                        <option value="50">50</option>
+                        <option value="55">55</option>
+                        <option value="60">60</option>
+                        <option value="65">65</option>
+                        <option value="70">70</option>
+                        <option value="75">75</option>
+                        <option value="80">80</option>
+                        <option value="85">85</option>
+                        <option value="90">90</option>
+                        <option value="95">95</option>
+                        <option value="100">100</option>
+                        <option value="105">105</option>
+                        <option value="110">110</option>
+                        <option value="115">115</option>
+                        <option value="120">120</option>
+                    </select>
+                </section>
+
+                <!-- Units -->
+                <section>
+                    <label class="mr-2" for="units">Units (repetitions): </label>
+                    <select class="p-2 border rounded-md" id="units">
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="20" selected>20</option>
+                        <option value="25">25</option>
+                        <option value="30">30</option>
+                    </select>
+                </section>
             </section>
 
-            <div id="unit-counter">Unit: 0 / 20</div>
+
+            <div id="unit-counter">Unit: 1 / 20</div>
             <div id="countdown">Ready...</div>
-            <div id="total-duration">Total Duration: 0 minutes</div>
             <div class="" id="progress-bar">
                 <div id="progress"></div>
             </div>
+            <div id="total-duration">Total Duration: 0 minutes</div>
 
             <audio id="beep" src="beep.mp3" preload="auto"></audio>
             <audio id="celebration" src="celebration.mp3" preload="auto"></audio>
         </section>
 
         <!-- History and total workout time -->
-        <section>
+        <section class="flex flex-col gap-8">
 
             <div class="pt-12" id="history">
                 <h2 class="text-4xl font-bold">Workout History</h2>
@@ -115,159 +127,271 @@
             </div>
 
             <div id="total-time">
-                <h2>Total Workout Time:</h2>
+                <h2 class="text-2xl font-bold">Total Workout Time</h2>
                 <p id="total-workout-time">0 minutes</p>
             </div>
         </section>
     </div>
 
     <script>
-        let timer;
-        let countdownInterval;
-        let paused = false;
+        // DOM Elements
+        let intervalDuration = document.getElementById("interval");
+        let unitDuration = document.getElementById("units");
+        let countdownDisplay = document.getElementById("countdown");
+        let unitCounter = document.getElementById("unit-counter");
+        let totalDuration = document.getElementById("total-duration");
+        let totalWorkoutTimeDisplay = document.getElementById("total-workout-time");
+        let progress = document.getElementById("progress");
+        let startButton = document.getElementById("start");
+        let pauseButton = document.getElementById("pause");
+        let stopButton = document.getElementById("stop");
+        let beepAudio = document.getElementById("beep");
+        let celebrationAudio = document.getElementById("celebration");
+
+        let currentInterval;
+        let currentUnits;
+
+        let timerInterval = null;
         let remainingTime;
-        let count = 0;
+        let unitsCompleted = 1;
+        let isPaused = false;
 
-        const unitCounter = document.getElementById("unit-counter");
-        const countdownDisplay = document.getElementById("countdown");
-        const totalDurationDisplay = document.getElementById("total-duration");
-        const progress = document.getElementById("progress");
-        const beep = document.getElementById("beep");
-        const celebration = document.getElementById("celebration");
-        const intervalInput = document.getElementById("interval");
-        const historyList = document.getElementById("history-list");
-        const totalWorkoutTimeDisplay = document.getElementById("total-workout-time");
+        let totalWorkoutTime = 0; // Sum of all workouts in seconds
 
-        const updateTotalDuration = () => {
-            const intervalDuration = parseInt(intervalInput.value, 10);
-            if (!isNaN(intervalDuration) && intervalDuration > 0) {
-                const totalMinutes = (intervalDuration * 20) / 60;
-                totalDurationDisplay.textContent = `Total Duration: ${totalMinutes.toFixed(1)} minutes`;
+
+
+        let historyList = document.getElementById("history-list");
+
+        // Load from local storage or set default values
+        window.addEventListener("DOMContentLoaded", () => {
+            const savedInterval = localStorage.getItem("intervalDuration");
+            const savedUnits = localStorage.getItem("unitDuration");
+            const savedWorkoutTime = localStorage.getItem("totalWorkoutTime");
+
+            if (savedInterval && savedUnits) {
+                intervalDuration.value = savedInterval;
+                unitDuration.value = savedUnits;
             } else {
-                totalDurationDisplay.textContent = "Total Duration: 0 minutes";
+                // Set defaults if no saved values
+                intervalDuration.value = "30";
+                unitDuration.value = "20";
+
+                // Save defaults to local storage
+                localStorage.setItem("intervalDuration", intervalDuration.value);
+                localStorage.setItem("unitDuration", unitDuration.value);
             }
-        };
 
-        intervalInput.addEventListener("input", updateTotalDuration);
-        updateTotalDuration();
+            currentInterval = parseInt(intervalDuration.value);
+            currentUnits = parseInt(unitDuration.value);
+            remainingTime = currentInterval;
+            totalWorkoutTime = savedWorkoutTime ? parseInt(savedWorkoutTime, 10) : 0;
 
-        // Load the last saved interval value from localStorage
-        if (localStorage.getItem('lastInterval')) {
-            intervalInput.value = localStorage.getItem('lastInterval');
             updateTotalDuration();
+            updateUnitCounter();
+            updateCountdown();
+            updateTotalWorkoutTime();
+
+
+            // Display previous workout history
+            displayWorkoutHistory();
+        });
+
+        // Helper functions for formatting dates and time
+        function formatDate(date) {
+            const day = String(date.getDate()).padStart(2, "0");
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            const year = date.getFullYear();
+            return `${day}.${month}.${year}`;
         }
 
-        // Save the current interval value to localStorage on change
-        intervalInput.addEventListener("change", () => {
-            localStorage.setItem('lastInterval', intervalInput.value);
-        });
+        function formatTime(ms) {
+            const date = new Date(ms);
+            const hours = String(date.getHours()).padStart(2, "0");
+            const minutes = String(date.getMinutes()).padStart(2, "0");
+            return `${hours}:${minutes}`;
+        }
 
-        // Load workout history from localStorage
-        const loadHistory = () => {
-            const history = JSON.parse(localStorage.getItem('workoutHistory')) || [];
-            historyList.innerHTML = history.map((session, index) => {
-                return `<li>Session ${index + 1} on ${session.date}: ${session.units} units, Duration: ${session.totalDuration} minutes</li>`;
-            }).join('');
-            const totalWorkoutTime = history.reduce((total, session) => total + parseFloat(session.totalDuration), 0);
-            totalWorkoutTimeDisplay.textContent = `${totalWorkoutTime.toFixed(1)} minutes`;
-        };
 
-        loadHistory();
+        // Update the total duration display for this workout
+        function updateTotalDuration() {
+            let currentWorkoutDuration = currentUnits * currentInterval; // Total seconds for this workout
+            let minutes = Math.floor(currentWorkoutDuration / 60);
+            let seconds = currentWorkoutDuration % 60;
 
-        const startCountdown = (timeLeft) => {
-            progress.style.width = "0%";
-            remainingTime = timeLeft;
-            clearInterval(countdownInterval);
+            totalDuration.textContent = `Total Duration: ${minutes} min ${seconds} sec`;
+        }
 
-            countdownInterval = setInterval(() => {
+        // Update total workout time display
+        function updateTotalWorkoutTime() {
+            let minutes = Math.floor(totalWorkoutTime / 60);
+            let seconds = totalWorkoutTime % 60;
+
+            totalWorkoutTimeDisplay.textContent = `${minutes} min ${seconds} sec`;
+        }
+
+        // Save total workout time to local storage
+        function saveTotalWorkoutTime() {
+            localStorage.setItem("totalWorkoutTime", totalWorkoutTime.toString());
+        }
+
+        // Update the unit counter display
+        function updateUnitCounter() {
+            unitCounter.textContent = `Unit: ${unitsCompleted} / ${currentUnits}`;
+        }
+
+        // Update the countdown and progress bar display
+        function updateCountdown() {
+            countdownDisplay.textContent = `Time Remaining: ${remainingTime} sec`;
+            progress.style.width = `${((currentInterval - remainingTime) / currentInterval) * 100}%`;
+        }
+
+
+        // Save workout history to localStorage
+        function saveWorkoutHistory(workoutDuration) {
+            const workoutDate = new Date();
+            const formattedDate = formatDate(workoutDate);
+            const workoutTime = formatTime(workoutDate);
+            const workoutDurationInMinutes = Math.floor(workoutDuration / 60);
+            const workoutDurationInSeconds = workoutDuration % 60;
+
+            const historyItem = {
+                date: formattedDate,
+                time: workoutTime,
+                duration: `${workoutDurationInMinutes} min ${workoutDurationInSeconds} sec`
+            };
+
+            // Get existing history from localStorage or create a new array
+            let workoutHistory = JSON.parse(localStorage.getItem("workoutHistory")) || [];
+            workoutHistory.push(historyItem);
+            localStorage.setItem("workoutHistory", JSON.stringify(workoutHistory));
+
+            // Display the workout history immediately after adding it
+            displayWorkoutHistory();
+        }
+
+        // Display workout history on the page
+        function displayWorkoutHistory() {
+            const workoutHistory = JSON.parse(localStorage.getItem("workoutHistory")) || [];
+            historyList.innerHTML = "";  // Clear the existing list
+
+            workoutHistory.forEach(item => {
+                const li = document.createElement("li");
+                li.textContent = `${item.date} ${item.time} - ${item.duration}`;
+                historyList.appendChild(li);
+            });
+        }
+
+
+        // Start or resume the workout
+        function startTimer() {
+            timerInterval = setInterval(() => {
                 if (remainingTime > 0) {
                     remainingTime--;
-                    countdownDisplay.textContent = `${remainingTime} seconds remaining`;
-                    progress.style.width = `${(intervalInput.value - remainingTime) / intervalInput.value * 100}%`;
+                    updateCountdown();
                 } else {
-                    clearInterval(countdownInterval);
+                    unitsCompleted++;
+                    beepAudio.play().catch((error) => {
+                        console.error("Error playing beep sound:", error);
+                    });
+
+                    if (unitsCompleted > currentUnits) {
+                        clearInterval(timerInterval);
+
+                        // Add the completed workout time to the total workout time
+                        let workoutDuration = currentUnits * currentInterval;
+                        totalWorkoutTime += workoutDuration;
+                        saveTotalWorkoutTime();
+                        updateTotalWorkoutTime();
+
+                        // Save the workout to history
+                        saveWorkoutHistory(workoutDuration);
+
+                        celebrationAudio.play().catch((error) => {
+                            console.error("Error playing celebration sound:", error);
+                        });
+                        countdownDisplay.textContent = "Workout Complete!";
+                        progress.style.width = "100%";
+                    } else {
+                        remainingTime = currentInterval;
+                        updateCountdown();
+                        updateUnitCounter();
+                    }
                 }
             }, 1000);
-        };
 
-        const saveWorkoutSession = () => {
-            const intervalDuration = parseInt(intervalInput.value, 10);
-            const totalDuration = (intervalDuration * 20) / 60;
-            const date = new Date().toLocaleString(); // Date and time of the workout session
-            const history = JSON.parse(localStorage.getItem('workoutHistory')) || [];
-            history.push({
-                units: 20,
-                totalDuration: totalDuration.toFixed(1),
-                date: date
-            });
-            localStorage.setItem('workoutHistory', JSON.stringify(history));
-            loadHistory();
-        };
+            startButton.disabled = true;
+            pauseButton.disabled = false;
+            stopButton.disabled = false;
+            pauseButton.textContent = "Pause";
+        }
 
-        document.getElementById("start").addEventListener("click", () => {
-            if (paused) {
-                paused = false;
-                document.getElementById("pause").textContent = "Pause"; // Change the button text back to "Pause"
-                startCountdown(remainingTime);
-                return;
-            }
-
-            const intervalDuration = parseInt(intervalInput.value, 10) * 1000;
-
-            if (isNaN(intervalDuration) || intervalDuration <= 0) {
-                alert("Please enter a valid number for interval duration.");
-                return;
-            }
-
-            count = 0;
-            unitCounter.textContent = "Unit: 0 / 20";
-            countdownDisplay.textContent = `${intervalInput.value} seconds remaining`;
-            progress.style.width = "0%";
-            clearInterval(timer);
-            clearInterval(countdownInterval);
-
-            timer = setInterval(() => {
-                if (count < 20) {
-                    count++;
-                    unitCounter.textContent = `Unit: ${count} / 20`;
-                    beep.play();
-                    startCountdown(parseInt(intervalInput.value, 10));
-                } else {
-                    clearInterval(timer);
-                    clearInterval(countdownInterval);
-                    countdownDisplay.textContent = "Done!";
-                    unitCounter.textContent = "All 20 units completed!";
-                    progress.style.width = "100%";
-                    celebration.play();
-                    saveWorkoutSession();  // Save the completed session to localStorage
-                }
-            }, intervalDuration);
-
-            startCountdown(parseInt(intervalInput.value, 10));
-        });
-
-        document.getElementById("pause").addEventListener("click", () => {
-            if (!paused) {
-                paused = true;
-                document.getElementById("pause").textContent = "Resume"; // Change the button text to "Resume"
-                clearInterval(timer);
-                clearInterval(countdownInterval);
-                countdownDisplay.textContent = "Paused.";
+        // Pause or resume the workout
+        function pauseResumeTimer() {
+            if (isPaused) {
+                isPaused = false;
+                pauseButton.textContent = "Pause";
+                startTimer(); // Resume the timer
             } else {
-                paused = false;
-                document.getElementById("pause").textContent = "Pause"; // Change back to "Pause"
-                startCountdown(remainingTime);
+                isPaused = true;
+                pauseButton.textContent = "Resume";
+                clearInterval(timerInterval); // Pause the timer
+            }
+        }
+
+        // Stop the workout and reset everything
+        function stopTimer() {
+            clearInterval(timerInterval);
+            startButton.disabled = false;
+            pauseButton.disabled = true;
+            stopButton.disabled = true;
+
+            countdownDisplay.textContent = "Ready...";
+            unitCounter.textContent = `Unit: 1 / ${currentUnits}`;
+            totalDuration.textContent = "Total Duration: 0 min 0 sec";
+            progress.style.width = "0%";
+
+            remainingTime = currentInterval;
+            unitsCompleted = 1;
+            isPaused = false;
+        }
+
+        // Update interval and unit values dynamically
+        intervalDuration.addEventListener("change", () => {
+            currentInterval = parseInt(intervalDuration.value);
+            remainingTime = currentInterval;
+            localStorage.setItem("intervalDuration", intervalDuration.value);
+            if (!isPaused && !timerInterval) {
+                updateCountdown();
+                updateTotalDuration();
             }
         });
 
-        document.getElementById("stop").addEventListener("click", () => {
-            clearInterval(timer);
-            clearInterval(countdownInterval);
-            paused = false;
-            countdownDisplay.textContent = "Stopped.";
-            unitCounter.textContent = `Unit: ${count} / 20`;
-            progress.style.width = "0%";
+        unitDuration.addEventListener("change", () => {
+            currentUnits = parseInt(unitDuration.value);
+            unitsCompleted = 1;
+            localStorage.setItem("unitDuration", unitDuration.value);
+            updateUnitCounter();
+            updateTotalDuration(); // Reset total duration when units change
         });
+
+        // Button event listeners
+        startButton.addEventListener("click", () => {
+            // Preload audio by playing and immediately pausing
+            beepAudio.play().then(() => beepAudio.pause()).catch((error) => {
+                console.error("Error initializing beep sound:", error);
+            });
+
+            celebrationAudio.play().then(() => celebrationAudio.pause()).catch((error) => {
+                console.error("Error initializing celebration sound:", error);
+            });
+
+            // Now start the timer
+            startTimer();
+        });
+
+        pauseButton.addEventListener("click", pauseResumeTimer);
+        stopButton.addEventListener("click", stopTimer);
+
     </script>
 </body>
 
