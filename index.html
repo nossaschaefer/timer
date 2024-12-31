@@ -158,9 +158,40 @@
 
         let totalWorkoutTime = 0; // Sum of all workouts in seconds
 
-
-
         let historyList = document.getElementById("history-list");
+
+        // Create a single AudioContext
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Load and decode audio files
+        async function loadAudio(url) {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            return await audioContext.decodeAudioData(arrayBuffer);
+        }
+
+        // Play an audio buffer
+        function playSound(buffer) {
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start(0);
+        }
+
+        // Buffers to store the loaded audio
+        let beepBuffer, celebrationBuffer;
+
+        // Preload audio files
+        window.addEventListener("DOMContentLoaded", async () => {
+            try {
+                beepBuffer = await loadAudio('beep.mp3');
+                celebrationBuffer = await loadAudio('celebration.mp3');
+            } catch (error) {
+                console.error("Error loading audio files:", error);
+            }
+        });
+
+
 
         // Load from local storage or set default values
         window.addEventListener("DOMContentLoaded", () => {
@@ -290,9 +321,8 @@
                     updateCountdown();
                 } else {
                     unitsCompleted++;
-                    beepAudio.play().catch((error) => {
-                        console.error("Error playing beep sound:", error);
-                    });
+                    if (beepBuffer) playSound(beepBuffer); // Play beep sound
+
 
                     if (unitsCompleted > currentUnits) {
                         clearInterval(timerInterval);
@@ -306,9 +336,7 @@
                         // Save the workout to history
                         saveWorkoutHistory(workoutDuration);
 
-                        celebrationAudio.play().catch((error) => {
-                            console.error("Error playing celebration sound:", error);
-                        });
+                        if (celebrationBuffer) playSound(celebrationBuffer); // Play celebration sound
                         countdownDisplay.textContent = "Workout Complete!";
                         progress.style.width = "100%";
                     } else {
@@ -375,17 +403,12 @@
         });
 
         // Button event listeners
-        startButton.addEventListener("click", () => {
-            // Preload audio by playing and immediately pausing
-            beepAudio.play().then(() => beepAudio.pause()).catch((error) => {
-                console.error("Error initializing beep sound:", error);
-            });
 
-            celebrationAudio.play().then(() => celebrationAudio.pause()).catch((error) => {
-                console.error("Error initializing celebration sound:", error);
-            });
-
-            // Now start the timer
+        // Ensure audio context starts on user interaction (required for some browsers)
+        startButton.addEventListener("click", async () => {
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
             startTimer();
         });
 
