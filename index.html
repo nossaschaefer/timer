@@ -160,6 +160,10 @@
 
         let historyList = document.getElementById("history-list");
 
+        // Create a silent audio object
+        const silentAudio = new Audio('silent.mp3');
+        silentAudio.loop = true; // Ensures the audio will loop continuously
+
         // Create a single AudioContext
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -315,6 +319,9 @@
 
         // Start or resume the workout
         function startTimer() {
+            // Play the silent audio to keep the app active even when the screen turns off
+            silentAudio.play();
+
             timerInterval = setInterval(() => {
                 if (remainingTime > 0) {
                     remainingTime--;
@@ -368,6 +375,9 @@
 
         // Stop the workout and reset everything
         function stopTimer() {
+            silentAudio.pause(); // Stop the silent audio
+            silentAudio.currentTime = 0; // Reset to the beginning of the file
+
             clearInterval(timerInterval);
             startButton.disabled = false;
             pauseButton.disabled = true;
